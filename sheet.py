@@ -2,7 +2,7 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 import json
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -20,11 +20,11 @@ service = build('sheets', 'v4', credentials=creds)
 sheet = service.spreadsheets()
 
 
-def get_sheet(sheet_id,row):
+def get_sheet(sheet_number,row):
     try:
         result = sheet.values().get(spreadsheetId=SPREADSHEET_ID,
                                 majorDimension="ROWS",
-                                range="Sheet"+str(sheet_id)+"!A1:E").execute()
+                                range="Sheet"+str(sheet_number)+"!A1:E").execute()
 
         values = result.get('values', [])
         rowdata = values[row]
@@ -34,14 +34,39 @@ def get_sheet(sheet_id,row):
     header = values[0]
         
     data = dict(zip(header, rowdata))
-    
+    return data
+
+def get_row_count(sheet_number):
+    try:
+        result = sheet.values().get(spreadsheetId=SPREADSHEET_ID,
+                                majorDimension="ROWS",
+                                range="Sheet"+str(sheet_number)+"!A1:E").execute()
+
+        values = result.get('values', [])
+        rowCount = len(values)
+    except:
+        rowCount = 0
+    return rowCount
+
+def write_sheet(sheet_number, rowdata):
+    rowCount = get_row_count(sheet_number)
+
+    try:
+        result = sheet.values().update(spreadsheetId=SPREADSHEET_ID,
+                                    range="Sheet"+str(sheet_number)+"!A"+str(rowCount+1),
+                                    valueInputOption = "USER_ENTERED",
+                                    body = rowdata 
+                                    ).execute()
+        data = result
+    except:
+        data = {}
     return data
 
 app = Flask(__name__)
 
-@app.route('/sheet/<int:sheet_id>/<int:row>', methods=['GET'])
-def index(sheet_id,row):
-    data = get_sheet(sheet_id,row)
+@app.route('/sheet/<int:sheet_number>/<int:row>', methods=['GET'])
+def index(sheet_number,row):
+    data = get_sheet(sheet_number,row)
 
     if data:
         message = "Data fetched successfully"
@@ -50,7 +75,22 @@ def index(sheet_id,row):
 
     res = {"message" : message, "data": data}
     
-    return jsonify(res)
+    return res
+
+@app.route('/sheet/<int:sheet_number>',methods=['POST'])
+def append_sheet(sheet_number):
+    body = request.get_json()
+    data = write_sheet(sheet_number,body)
+
+    if data:
+        message = "Data updated successfully"
+    else:
+        message = "Data not updated"
+
+    res = {"message" : message, "data": data}
+    
+    return res
+    
 
 if __name__ == '__main__':
     app.run(host="localhost", port=8000, debug=True)
