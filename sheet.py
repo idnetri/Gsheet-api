@@ -2,7 +2,7 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 import json
 
-from flask import Flask
+from flask import Flask, jsonify
 
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -21,16 +21,21 @@ sheet = service.spreadsheets()
 
 
 def get_sheet(sheet_id,row):
-    result = sheet.values().get(spreadsheetId=SPREADSHEET_ID,
-                            majorDimension="ROWS",
-                            range="Sheet"+str(sheet_id)+"!A1:E").execute()
-    values = result.get('values', [])
+    try:
+        result = sheet.values().get(spreadsheetId=SPREADSHEET_ID,
+                                majorDimension="ROWS",
+                                range="Sheet"+str(sheet_id)+"!A1:E").execute()
 
-    if row > 0:
-        index = row-1
-    jsonStr = json.dumps(values[index])
+        values = result.get('values', [])
+        rowdata = values[row]
+    except:
+        rowdata  = {}
+
+    header = values[0]
+        
+    data = dict(zip(header, rowdata))
     
-    return jsonStr
+    return data
 
 app = Flask(__name__)
 
@@ -38,7 +43,14 @@ app = Flask(__name__)
 def index(sheet_id,row):
     data = get_sheet(sheet_id,row)
 
-    return { "row" : data }
+    if data:
+        message = "Data fetched successfully"
+    else:
+        message = "Data not found"
+
+    res = {"message" : message, "data": data}
+    
+    return jsonify(res)
 
 if __name__ == '__main__':
     app.run(host="localhost", port=8000, debug=True)
