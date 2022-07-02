@@ -98,16 +98,12 @@ def token_required(f):
 def index(sheet_number,row):
     data = get_sheet(sheet_number,row)
 
-    print(type(data))
-
     if data:
         message = "Data fetched successfully"
     else:
         message = "Data not found"
 
     res = {"message" : message, "data": data}
-
-
     
     return jsonify(res),200
 
